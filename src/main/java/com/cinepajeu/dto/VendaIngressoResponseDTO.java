@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -18,4 +20,5 @@ public class VendaIngressoResponseDTO {
     private Integer quantidade;
     private BigDecimal valorTotal;
     private LocalDateTime dataVenda;
+    private List<String> assentos;
 }

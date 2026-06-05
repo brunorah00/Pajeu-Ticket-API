@@ -43,7 +43,7 @@ public class ProdutoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO','CLIENTE')")
     @Operation(summary = "Buscar um produto por ID")
     public ResponseEntity<ProdutoResponseDTO> buscarPorId(@PathVariable Long id) {
         ProdutoResponseDTO response = produtoService.buscarPorId(id);
@@ -51,7 +51,7 @@ public class ProdutoController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO','CLIENTE')")
     @Operation(summary = "Listar produtos de forma paginada")
     public ResponseEntity<Page<ProdutoResponseDTO>> listar(Pageable pageable) {
         Page<ProdutoResponseDTO> response = produtoService.listar(pageable);

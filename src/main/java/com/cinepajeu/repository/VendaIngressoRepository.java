@@ -3,6 +3,7 @@ package com.cinepajeu.repository;
 import com.cinepajeu.entity.VendaIngresso;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,4 +28,18 @@ public interface VendaIngressoRepository extends JpaRepository<VendaIngresso, Lo
     List<Object[]> findSessoesMaisVendidas(Pageable pageable);
 
     List<VendaIngresso> findByDataVendaBetween(LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COUNT(v) FROM VendaIngresso v WHERE v.sessao.filme.id = :filmeId")
+    long countByFilmeId(@Param("filmeId") Long filmeId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM VendaIngresso v WHERE v.sessao.filme.id = :filmeId")
+    void deleteByFilmeId(@Param("filmeId") Long filmeId);
+
+    @Query("SELECT COUNT(v) FROM VendaIngresso v WHERE v.sessao.id = :sessaoId")
+    long countBySessaoId(@Param("sessaoId") Long sessaoId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM VendaIngresso v WHERE v.sessao.id = :sessaoId")
+    void deleteBySessaoId(@Param("sessaoId") Long sessaoId);
 }

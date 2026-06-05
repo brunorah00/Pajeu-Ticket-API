@@ -74,4 +74,23 @@ public class FilmeUploadServiceImpl implements FilmeUploadService {
             throw new BusinessException("Erro ao salvar imagem: " + e.getMessage());
         }
     }
+
+    @Override
+    @Transactional
+    public FilmeResponseDTO removerPoster(Long filmeId) {
+        Filme filme = filmeRepository.findById(filmeId)
+                .orElseThrow(() -> new BusinessException("Filme não encontrado com o ID: " + filmeId));
+
+        if (filme.getUrlImagem() != null) {
+            Path antigo = Paths.get(uploadDir).resolve(filme.getUrlImagem().replaceFirst("^/uploads/", ""));
+            try {
+                Files.deleteIfExists(antigo);
+            } catch (IOException ignored) {
+                // ignora falha ao remover arquivo
+            }
+            filme.setUrlImagem(null);
+        }
+
+        return ModelMapper.toDto(filmeRepository.save(filme));
+    }
 }

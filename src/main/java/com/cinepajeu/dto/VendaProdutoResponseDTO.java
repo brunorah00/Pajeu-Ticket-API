@@ -1,5 +1,6 @@
 package com.cinepajeu.dto;
 
+import com.cinepajeu.entity.StatusPedidoBomboniere;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,6 +16,10 @@ import java.util.List;
 @AllArgsConstructor
 public class VendaProdutoResponseDTO {
     private Long id;
+    private String codigoPedido;
+    private StatusPedidoBomboniere status;
+    private String clienteNome;
+    private String clienteLogin;
     private LocalDateTime dataVenda;
     private BigDecimal valorTotal;
     private List<ItemVendaProdutoResponseDTO> itens;

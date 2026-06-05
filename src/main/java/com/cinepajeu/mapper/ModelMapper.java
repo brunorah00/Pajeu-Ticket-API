@@ -2,7 +2,9 @@ package com.cinepajeu.mapper;
 
 import com.cinepajeu.dto.*;
 import com.cinepajeu.entity.*;
+import com.cinepajeu.util.SessaoEncerramento;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class ModelMapper {
@@ -81,6 +83,7 @@ public class ModelMapper {
                 .horario(entity.getHorario())
                 .valorIngresso(entity.getValorIngresso())
                 .lugaresDisponiveis(entity.getLugaresDisponiveis())
+                .encerrada(SessaoEncerramento.isEncerrada(entity.getData(), entity.getHorario()))
                 .build();
     }
 
@@ -97,6 +100,10 @@ public class ModelMapper {
     }
 
     public static VendaIngressoResponseDTO toDto(VendaIngresso entity) {
+        return toDto(entity, List.of());
+    }
+
+    public static VendaIngressoResponseDTO toDto(VendaIngresso entity, List<String> assentos) {
         if (entity == null) return null;
         return VendaIngressoResponseDTO.builder()
                 .id(entity.getId())
@@ -104,6 +111,7 @@ public class ModelMapper {
                 .quantidade(entity.getQuantidade())
                 .valorTotal(entity.getValorTotal())
                 .dataVenda(entity.getDataVenda())
+                .assentos(assentos)
                 .build();
     }
 
@@ -149,8 +157,13 @@ public class ModelMapper {
 
     public static VendaProdutoResponseDTO toDto(VendaProduto entity) {
         if (entity == null) return null;
+        var cliente = entity.getCliente();
         return VendaProdutoResponseDTO.builder()
                 .id(entity.getId())
+                .codigoPedido(entity.getCodigoPedido())
+                .status(entity.getStatus())
+                .clienteNome(cliente != null ? cliente.getNome() : null)
+                .clienteLogin(cliente != null ? cliente.getLogin() : null)
                 .dataVenda(entity.getDataVenda())
                 .valorTotal(entity.getValorTotal())
                 .itens(entity.getItens() == null ? null : entity.getItens().stream()

@@ -1,23 +1,31 @@
 package com.cinepajeu.service.impl;
 
+import com.cinepajeu.dto.AtualizarStatusPedidoDTO;
 import com.cinepajeu.dto.ItemVendaProdutoRequestDTO;
 import com.cinepajeu.dto.VendaProdutoRequestDTO;
 import com.cinepajeu.dto.VendaProdutoResponseDTO;
 import com.cinepajeu.entity.ItemVendaProduto;
 import com.cinepajeu.entity.Produto;
+import com.cinepajeu.entity.StatusPedidoBomboniere;
+import com.cinepajeu.entity.Usuario;
 import com.cinepajeu.entity.VendaProduto;
 import com.cinepajeu.exception.BusinessException;
 import com.cinepajeu.mapper.ModelMapper;
 import com.cinepajeu.repository.ProdutoRepository;
 import com.cinepajeu.repository.VendaProdutoRepository;
 import com.cinepajeu.service.VendaProdutoService;
+import com.cinepajeu.util.CodigoPedidoGenerator;
+import com.cinepajeu.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,11 +33,17 @@ public class VendaProdutoServiceImpl implements VendaProdutoService {
 
     private final VendaProdutoRepository vendaProdutoRepository;
     private final ProdutoRepository produtoRepository;
+    private final CodigoPedidoGenerator codigoPedidoGenerator;
 
     @Override
     @Transactional
     public VendaProdutoResponseDTO registrarVenda(VendaProdutoRequestDTO request) {
+        Usuario cliente = SecurityUtils.getUsuarioAutenticado();
+
         VendaProduto venda = VendaProduto.builder()
+                .codigoPedido(codigoPedidoGenerator.gerar())
+                .status(StatusPedidoBomboniere.PENDENTE)
+                .cliente(cliente)
                 .dataVenda(LocalDateTime.now())
                 .valorTotal(BigDecimal.ZERO)
                 .itens(new ArrayList<>())
@@ -75,5 +89,26 @@ public class VendaProdutoServiceImpl implements VendaProdutoService {
 
         VendaProduto salva = vendaProdutoRepository.save(venda);
         return ModelMapper.toDto(salva);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VendaProdutoResponseDTO> listarPedidos(StatusPedidoBomboniere status) {
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime inicio = hoje.atStartOfDay();
+        LocalDateTime fim = hoje.atTime(LocalTime.MAX);
+        return vendaProdutoRepository.findPedidosComItens(inicio, fim, status).stream()
+                .map(ModelMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public VendaProdutoResponseDTO atualizarStatus(Long id, AtualizarStatusPedidoDTO request) {
+        VendaProduto venda = vendaProdutoRepository.findByIdComItens(id)
+                .orElseThrow(() -> new BusinessException("Pedido não encontrado com o ID: " + id));
+        venda.setStatus(request.getStatus());
+        vendaProdutoRepository.save(venda);
+        return ModelMapper.toDto(venda);
     }
 }

@@ -1,5 +1,6 @@
 package com.cinepajeu.service.impl;
 
+import com.cinepajeu.dto.SessaoAssentosDTO;
 import com.cinepajeu.dto.SessaoRequestDTO;
 import com.cinepajeu.dto.SessaoResponseDTO;
 import com.cinepajeu.entity.Filme;
@@ -7,24 +8,32 @@ import com.cinepajeu.entity.Sala;
 import com.cinepajeu.entity.Sessao;
 import com.cinepajeu.exception.BusinessException;
 import com.cinepajeu.mapper.ModelMapper;
+import com.cinepajeu.repository.AssentoReservadoRepository;
 import com.cinepajeu.repository.FilmeRepository;
 import com.cinepajeu.repository.SalaRepository;
 import com.cinepajeu.repository.SessaoRepository;
+import com.cinepajeu.repository.VendaIngressoRepository;
 import com.cinepajeu.service.SalaPadraoService;
 import com.cinepajeu.service.SessaoService;
+import com.cinepajeu.util.MapaSala;
+import com.cinepajeu.util.SessaoHorarioConflito;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class SessaoServiceImpl implements SessaoService {
 
     private final SessaoRepository sessaoRepository;
+    private final AssentoReservadoRepository assentoReservadoRepository;
     private final FilmeRepository filmeRepository;
     private final SalaRepository salaRepository;
+    private final VendaIngressoRepository vendaIngressoRepository;
     private final SalaPadraoService salaPadraoService;
 
     private Sala resolverSala(Long salaId) {
@@ -48,6 +57,14 @@ public class SessaoServiceImpl implements SessaoService {
                     ") não pode ser maior que a capacidade da sala (" + sala.getCapacidade() + ")");
         }
 
+        SessaoHorarioConflito.validar(
+                filme,
+                request.getData(),
+                request.getHorario(),
+                sessaoRepository.findByData(request.getData()),
+                null
+        );
+
         Sessao sessao = ModelMapper.toEntity(request, filme, sala);
         Sessao salva = sessaoRepository.save(sessao);
         return ModelMapper.toDto(salva);
@@ -68,6 +85,14 @@ public class SessaoServiceImpl implements SessaoService {
             throw new BusinessException("A quantidade de lugares disponíveis (" + request.getLugaresDisponiveis() + 
                     ") não pode ser maior que a capacidade da sala (" + sala.getCapacidade() + ")");
         }
+
+        SessaoHorarioConflito.validar(
+                filme,
+                request.getData(),
+                request.getHorario(),
+                sessaoRepository.findByData(request.getData()),
+                id
+        );
 
         sessao.setFilme(filme);
         sessao.setSala(sala);
@@ -93,15 +118,27 @@ public class SessaoServiceImpl implements SessaoService {
     }
 
     @Override
+    public SessaoAssentosDTO listarAssentos(Long sessaoId) {
+        if (!sessaoRepository.existsById(sessaoId)) {
+            throw new BusinessException("Sessão não encontrada com o ID: " + sessaoId);
+        }
+        List<String> ocupados = assentoReservadoRepository.findBySessaoId(sessaoId).stream()
+                .map(a -> a.getCodigoAssento())
+                .sorted()
+                .toList();
+        return SessaoAssentosDTO.builder()
+                .ocupados(ocupados)
+                .totalAssentos(MapaSala.getAssentosValidos().size())
+                .build();
+    }
+
+    @Override
     @Transactional
     public void excluir(Long id) {
         if (!sessaoRepository.existsById(id)) {
             throw new BusinessException("Sessão não encontrada com o ID: " + id);
         }
-        try {
-            sessaoRepository.deleteById(id);
-        } catch (Exception e) {
-            throw new BusinessException("Não é possível excluir a sessão pois existem vendas vinculadas a ela");
-        }
+        vendaIngressoRepository.deleteBySessaoId(id);
+        sessaoRepository.deleteById(id);
     }
 }

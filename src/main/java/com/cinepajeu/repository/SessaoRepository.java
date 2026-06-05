@@ -11,7 +11,9 @@ import java.util.List;
 
 @Repository
 public interface SessaoRepository extends JpaRepository<Sessao, Long> {
-    
+
+    List<Sessao> findByFilmeId(Long filmeId);
+
     @Query("SELECT s FROM Sessao s JOIN FETCH s.filme JOIN FETCH s.sala WHERE s.data = :data")
     List<Sessao> findByData(@Param("data") LocalDate data);
 }

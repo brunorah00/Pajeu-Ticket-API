@@ -6,7 +6,10 @@ import com.cinepajeu.entity.Filme;
 import com.cinepajeu.exception.BusinessException;
 import com.cinepajeu.mapper.ModelMapper;
 import com.cinepajeu.repository.FilmeRepository;
+import com.cinepajeu.repository.SessaoRepository;
+import com.cinepajeu.repository.VendaIngressoRepository;
 import com.cinepajeu.service.FilmeService;
+import com.cinepajeu.service.FilmeUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class FilmeServiceImpl implements FilmeService {
 
     private final FilmeRepository filmeRepository;
+    private final SessaoRepository sessaoRepository;
+    private final VendaIngressoRepository vendaIngressoRepository;
+    private final FilmeUploadService filmeUploadService;
 
     @Override
     @Transactional
@@ -51,24 +57,32 @@ public class FilmeServiceImpl implements FilmeService {
     public FilmeResponseDTO buscarPorId(Long id) {
         Filme filme = filmeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Filme não encontrado com o ID: " + id));
-        return ModelMapper.toDto(filme);
+        return enriquecerComVendas(ModelMapper.toDto(filme), id);
     }
 
     @Override
     public Page<FilmeResponseDTO> listar(Pageable pageable) {
-        return filmeRepository.findAll(pageable).map(ModelMapper::toDto);
+        return filmeRepository.findAll(pageable).map(f -> enriquecerComVendas(ModelMapper.toDto(f), f.getId()));
+    }
+
+    private FilmeResponseDTO enriquecerComVendas(FilmeResponseDTO dto, Long filmeId) {
+        dto.setQuantidadeVendasIngresso(vendaIngressoRepository.countByFilmeId(filmeId));
+        return dto;
     }
 
     @Override
     @Transactional
     public void excluir(Long id) {
-        if (!filmeRepository.existsById(id)) {
-            throw new BusinessException("Filme não encontrado com o ID: " + id);
+        Filme filme = filmeRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Filme não encontrado com o ID: " + id));
+
+        vendaIngressoRepository.deleteByFilmeId(id);
+        sessaoRepository.deleteAll(sessaoRepository.findByFilmeId(id));
+
+        if (filme.getUrlImagem() != null) {
+            filmeUploadService.removerPoster(id);
         }
-        try {
-            filmeRepository.deleteById(id);
-        } catch (Exception e) {
-            throw new BusinessException("Não é possível excluir o filme pois existem sessões ou registros associados a ele");
-        }
+
+        filmeRepository.delete(filme);
     }
 }

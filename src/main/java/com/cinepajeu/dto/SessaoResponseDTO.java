@@ -20,4 +20,6 @@ public class SessaoResponseDTO {
     private LocalTime horario;
     private BigDecimal valorIngresso;
     private Integer lugaresDisponiveis;
+    /** true quando já passaram 10 min após o horário de início. */
+    private Boolean encerrada;
 }

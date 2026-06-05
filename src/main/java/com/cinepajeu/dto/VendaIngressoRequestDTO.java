@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,7 +18,9 @@ public class VendaIngressoRequestDTO {
     @NotNull(message = "O ID da sessão é obrigatório")
     private Long sessaoId;
 
-    @NotNull(message = "A quantidade de ingressos é obrigatória")
-    @Positive(message = "A quantidade de ingressos deve ser maior que zero")
+    /** Quantidade (legado). Ignorada se `assentos` for informado. */
     private Integer quantidade;
+
+    /** Códigos das poltronas (ex.: A5, F7). */
+    private List<String> assentos;
 }

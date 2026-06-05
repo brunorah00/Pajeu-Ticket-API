@@ -1,5 +1,6 @@
 package com.cinepajeu.controller;
 
+import com.cinepajeu.dto.SessaoAssentosDTO;
 import com.cinepajeu.dto.SessaoRequestDTO;
 import com.cinepajeu.dto.SessaoResponseDTO;
 import com.cinepajeu.service.SessaoService;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,6 +24,7 @@ public class SessaoController {
     private final SessaoService sessaoService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
     @Operation(summary = "Cadastrar uma nova sessão de filme")
     public ResponseEntity<SessaoResponseDTO> cadastrar(@Valid @RequestBody SessaoRequestDTO request) {
         SessaoResponseDTO response = sessaoService.cadastrar(request);
@@ -29,6 +32,7 @@ public class SessaoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
     @Operation(summary = "Atualizar uma sessão existente")
     public ResponseEntity<SessaoResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody SessaoRequestDTO request) {
         SessaoResponseDTO response = sessaoService.atualizar(id, request);
@@ -49,7 +53,14 @@ public class SessaoController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}/assentos")
+    @Operation(summary = "Listar assentos ocupados da sessão")
+    public ResponseEntity<SessaoAssentosDTO> listarAssentos(@PathVariable Long id) {
+        return ResponseEntity.ok(sessaoService.listarAssentos(id));
+    }
+
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
     @Operation(summary = "Excluir uma sessão")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         sessaoService.excluir(id);

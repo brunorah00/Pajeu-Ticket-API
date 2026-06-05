@@ -18,4 +18,6 @@ public class FilmeResponseDTO {
     private String sinopse;
     private Boolean status;
     private String urlImagem;
+    /** Vendas de ingresso vinculadas às sessões deste filme (painel). */
+    private Long quantidadeVendasIngresso;
 }

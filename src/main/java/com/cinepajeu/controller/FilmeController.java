@@ -57,7 +57,7 @@ public class FilmeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
     @Operation(summary = "Excluir um filme do sistema")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         filmeService.excluir(id);
@@ -71,5 +71,12 @@ public class FilmeController {
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(filmeUploadService.uploadPoster(id, file));
+    }
+
+    @DeleteMapping("/{id}/poster")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @Operation(summary = "Remover o poster (cartaz) do filme")
+    public ResponseEntity<FilmeResponseDTO> removerPoster(@PathVariable Long id) {
+        return ResponseEntity.ok(filmeUploadService.removerPoster(id));
     }
 }
