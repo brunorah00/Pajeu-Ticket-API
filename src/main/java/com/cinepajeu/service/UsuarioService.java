@@ -7,6 +7,9 @@ public interface UsuarioService {
     LoginResponseDTO refreshToken(RefreshTokenRequestDTO request);
     void alterarSenha(AlterarSenhaRequestDTO request);
     void recuperarSenha(RecuperarSenhaRequestDTO request);
+    ValidarTokenRecuperacaoDTO validarTokenRecuperacao(String token);
+    void redefinirSenha(RedefinirSenhaRequestDTO request);
+    LoginResponseDTO loginOAuth(OAuthLoginRequestDTO request);
     UsuarioResponseDTO cadastrar(UsuarioRequestDTO request);
     UsuarioResponseDTO buscarPorId(Long id);
     java.util.List<UsuarioResponseDTO> listarFuncionarios();

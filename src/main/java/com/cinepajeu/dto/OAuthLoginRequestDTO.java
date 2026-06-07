@@ -1,6 +1,5 @@
 package com.cinepajeu.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,9 +10,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RecuperarSenhaRequestDTO {
+public class OAuthLoginRequestDTO {
 
-    @NotBlank(message = "O e-mail é obrigatório")
-    @Email(message = "Informe um e-mail válido")
-    private String login;
+    @NotBlank(message = "O provedor é obrigatório")
+    private String provider;
+
+    @NotBlank(message = "O token de acesso é obrigatório")
+    private String token;
 }

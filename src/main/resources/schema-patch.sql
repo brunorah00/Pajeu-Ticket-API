@@ -30,3 +30,22 @@ CREATE TABLE IF NOT EXISTS tb_assento_reservado (
     codigo_assento VARCHAR(8) NOT NULL,
     CONSTRAINT uk_assento_sessao_codigo UNIQUE (sessao_id, codigo_assento)
 );
+
+-- OAuth e recuperação de senha
+ALTER TABLE tb_usuario ADD COLUMN IF NOT EXISTS oauth_provider VARCHAR(20);
+ALTER TABLE tb_usuario ADD COLUMN IF NOT EXISTS oauth_subject VARCHAR(255);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_usuario_oauth
+  ON tb_usuario (oauth_provider, oauth_subject)
+  WHERE oauth_provider IS NOT NULL AND oauth_subject IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS tb_token_recuperacao_senha (
+    id BIGSERIAL PRIMARY KEY,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    usuario_id BIGINT NOT NULL REFERENCES tb_usuario(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL,
+    used_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_recuperacao_usuario
+  ON tb_token_recuperacao_senha (usuario_id);

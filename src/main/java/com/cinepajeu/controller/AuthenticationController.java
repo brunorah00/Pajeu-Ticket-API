@@ -55,9 +55,30 @@ public class AuthenticationController {
     }
 
     @PostMapping("/recuperar-senha")
-    @Operation(summary = "Solicitar recuperação de senha (estrutura preparada)")
+    @Operation(summary = "Solicitar recuperação de senha por e-mail")
     public ResponseEntity<String> recuperarSenha(@Valid @RequestBody RecuperarSenhaRequestDTO request) {
         usuarioService.recuperarSenha(request);
-        return ResponseEntity.ok("Solicitação de recuperação processada. Verifique os logs do console.");
+        return ResponseEntity.ok(
+                "Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha em alguns minutos.");
+    }
+
+    @GetMapping("/redefinir-senha/validar")
+    @Operation(summary = "Validar token de recuperação de senha")
+    public ResponseEntity<ValidarTokenRecuperacaoDTO> validarTokenRecuperacao(@RequestParam String token) {
+        return ResponseEntity.ok(usuarioService.validarTokenRecuperacao(token));
+    }
+
+    @PostMapping("/redefinir-senha")
+    @Operation(summary = "Redefinir senha com token recebido por e-mail")
+    public ResponseEntity<String> redefinirSenha(@Valid @RequestBody RedefinirSenhaRequestDTO request) {
+        usuarioService.redefinirSenha(request);
+        return ResponseEntity.ok("Senha redefinida com sucesso. Faça login com a nova senha.");
+    }
+
+    @PostMapping("/oauth")
+    @Operation(summary = "Login com Google ou Facebook")
+    public ResponseEntity<LoginResponseDTO> loginOAuth(@Valid @RequestBody OAuthLoginRequestDTO request) {
+        LoginResponseDTO response = usuarioService.loginOAuth(request);
+        return ResponseEntity.ok(response);
     }
 }

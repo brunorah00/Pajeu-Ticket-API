@@ -1,16 +1,24 @@
 package com.cinepajeu.service.impl;
 
 import com.cinepajeu.dto.*;
+import com.cinepajeu.entity.OAuthProvider;
+import com.cinepajeu.entity.TokenRecuperacaoSenha;
 import com.cinepajeu.entity.UserRole;
 import com.cinepajeu.entity.Usuario;
 import com.cinepajeu.exception.BusinessException;
 import com.cinepajeu.mapper.ModelMapper;
+import com.cinepajeu.repository.TokenRecuperacaoSenhaRepository;
 import com.cinepajeu.repository.UsuarioRepository;
+import com.cinepajeu.util.EmailValidator;
 import com.cinepajeu.util.LoginNormalizer;
 import com.cinepajeu.security.JwtService;
+import com.cinepajeu.service.EmailService;
+import com.cinepajeu.service.OAuthUserInfo;
+import com.cinepajeu.service.OAuthVerificationService;
 import com.cinepajeu.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,9 +35,18 @@ import java.util.List;
 public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final TokenRecuperacaoSenhaRepository tokenRecuperacaoSenhaRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
+    private final OAuthVerificationService oauthVerificationService;
+
+    @Value("${app.frontend.base-url:http://localhost:3000}")
+    private String frontendBaseUrl;
+
+    @Value("${app.password-reset.expiration-minutes:15}")
+    private int passwordResetExpirationMinutes;
 
     @Override
     @Transactional
@@ -41,22 +59,13 @@ public class UsuarioServiceImpl implements UsuarioService {
             throw new BusinessException("Credenciais inválidas: login ou senha incorretos");
         }
 
-        Usuario usuario = usuarioRepository.findByLogin(request.getLogin())
+        Usuario usuario = usuarioRepository.findByLoginIgnoreCase(LoginNormalizer.normalize(request.getLogin()))
                 .orElseThrow(() -> new BusinessException("Usuário não encontrado após autenticação"));
 
         usuario.setUltimoAcesso(LocalDateTime.now());
         usuarioRepository.save(usuario);
 
-        String token = jwtService.generateToken(usuario);
-        String refreshToken = jwtService.generateRefreshToken(usuario);
-
-        return LoginResponseDTO.builder()
-                .token(token)
-                .refreshToken(refreshToken)
-                .login(usuario.getLogin())
-                .nome(usuario.getNome())
-                .role(usuario.getRole().name())
-                .build();
+        return buildLoginResponse(usuario);
     }
 
     @Override
@@ -104,13 +113,136 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
+    @Transactional
     public void recuperarSenha(RecuperarSenhaRequestDTO request) {
         String login = LoginNormalizer.normalize(request.getLogin());
-        Usuario usuario = usuarioRepository.findByLoginIgnoreCase(login)
-                .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+        if (login == null || login.isBlank()) {
+            return;
+        }
 
-        // Estrutura preparada para envio de e-mail / recuperação
-        log.info("Recuperação de senha solicitada para o login: {}. Preparado link de reset para o e-mail cadastrado.", usuario.getLogin());
+        if (!EmailValidator.isValid(login)) {
+            return;
+        }
+
+        usuarioRepository.findByLoginIgnoreCase(login).ifPresent(usuario -> {
+            tokenRecuperacaoSenhaRepository.invalidateActiveTokensForUsuario(
+                    usuario.getId(), LocalDateTime.now());
+
+            String token = UUID.randomUUID().toString().replace("-", "");
+            TokenRecuperacaoSenha reset = TokenRecuperacaoSenha.builder()
+                    .token(token)
+                    .usuario(usuario)
+                    .expiresAt(LocalDateTime.now().plusMinutes(passwordResetExpirationMinutes))
+                    .build();
+            tokenRecuperacaoSenhaRepository.save(reset);
+
+            String link = frontendBaseUrl.replaceAll("/$", "") + "/redefinir-senha?token=" + token;
+            emailService.enviarRecuperacaoSenha(login, usuario.getNome(), link);
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ValidarTokenRecuperacaoDTO validarTokenRecuperacao(String token) {
+        if (token == null || token.isBlank()) {
+            return ValidarTokenRecuperacaoDTO.builder().valido(false).build();
+        }
+
+        return tokenRecuperacaoSenhaRepository.findByTokenAndUsedAtIsNull(token.trim())
+                .filter(t -> t.getExpiresAt().isAfter(LocalDateTime.now()))
+                .map(t -> ValidarTokenRecuperacaoDTO.builder()
+                        .valido(true)
+                        .login(t.getUsuario().getLogin())
+                        .build())
+                .orElse(ValidarTokenRecuperacaoDTO.builder().valido(false).build());
+    }
+
+    @Override
+    @Transactional
+    public void redefinirSenha(RedefinirSenhaRequestDTO request) {
+        TokenRecuperacaoSenha reset = tokenRecuperacaoSenhaRepository
+                .findByTokenAndUsedAtIsNull(request.getToken().trim())
+                .orElseThrow(() -> new BusinessException("Link inválido ou expirado"));
+
+        if (reset.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("Link expirado. Solicite uma nova recuperação de senha.");
+        }
+
+        Usuario usuario = reset.getUsuario();
+        usuario.setSenha(passwordEncoder.encode(request.getSenhaNova()));
+        usuarioRepository.save(usuario);
+
+        reset.setUsedAt(LocalDateTime.now());
+        tokenRecuperacaoSenhaRepository.save(reset);
+        tokenRecuperacaoSenhaRepository.invalidateActiveTokensForUsuario(
+                usuario.getId(), LocalDateTime.now());
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseDTO loginOAuth(OAuthLoginRequestDTO request) {
+        OAuthProvider provider;
+        try {
+            provider = OAuthProvider.valueOf(request.getProvider().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Provedor OAuth inválido");
+        }
+
+        OAuthUserInfo info = oauthVerificationService.verify(provider, request.getToken());
+        EmailValidator.requireValid(info.email());
+
+        Usuario usuario = usuarioRepository
+                .findByOauthProviderAndOauthSubject(provider, info.subject())
+                .orElseGet(() -> usuarioRepository.findByLoginIgnoreCase(info.email())
+                        .map(existing -> linkOAuthAccount(existing, provider, info))
+                        .orElseGet(() -> createOAuthUser(provider, info)));
+
+        if (usuario.getRole() != UserRole.CLIENTE) {
+            throw new BusinessException(
+                    "Contas de equipe devem entrar com login e senha. Use o acesso do painel.");
+        }
+
+        usuario.setUltimoAcesso(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        return buildLoginResponse(usuario);
+    }
+
+    private Usuario linkOAuthAccount(Usuario usuario, OAuthProvider provider, OAuthUserInfo info) {
+        if (usuario.getOauthProvider() != null
+                && usuario.getOauthSubject() != null
+                && (!usuario.getOauthProvider().equals(provider)
+                || !usuario.getOauthSubject().equals(info.subject()))) {
+            throw new BusinessException("Este e-mail já está vinculado a outra conta social");
+        }
+        usuario.setOauthProvider(provider);
+        usuario.setOauthSubject(info.subject());
+        if (info.nome() != null && !info.nome().isBlank()) {
+            usuario.setNome(info.nome());
+        }
+        return usuario;
+    }
+
+    private Usuario createOAuthUser(OAuthProvider provider, OAuthUserInfo info) {
+        Usuario usuario = Usuario.builder()
+                .nome(info.nome())
+                .login(info.email())
+                .senha(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .role(UserRole.CLIENTE)
+                .oauthProvider(provider)
+                .oauthSubject(info.subject())
+                .build();
+        return usuarioRepository.save(usuario);
+    }
+
+    private LoginResponseDTO buildLoginResponse(Usuario usuario) {
+        return LoginResponseDTO.builder()
+                .token(jwtService.generateToken(usuario))
+                .refreshToken(jwtService.generateRefreshToken(usuario))
+                .login(usuario.getLogin())
+                .nome(usuario.getNome())
+                .role(usuario.getRole().name())
+                .build();
     }
 
     @Override
@@ -120,6 +252,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         if (login == null || login.isEmpty()) {
             throw new BusinessException("Login inválido");
         }
+
+        EmailValidator.requireValid(login);
 
         if (usuarioRepository.findByLoginIgnoreCase(login).isPresent()) {
             throw new BusinessException("Já existe um usuário cadastrado com este login");
