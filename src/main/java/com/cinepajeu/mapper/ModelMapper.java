@@ -105,8 +105,13 @@ public class ModelMapper {
 
     public static VendaIngressoResponseDTO toDto(VendaIngresso entity, List<String> assentos) {
         if (entity == null) return null;
+        var cliente = entity.getCliente();
         return VendaIngressoResponseDTO.builder()
                 .id(entity.getId())
+                .codigoPedido(entity.getCodigoPedido())
+                .status(entity.getStatus())
+                .clienteNome(cliente != null ? cliente.getNome() : null)
+                .clienteLogin(cliente != null ? cliente.getLogin() : null)
                 .sessao(toDto(entity.getSessao()))
                 .quantidade(entity.getQuantidade())
                 .valorTotal(entity.getValorTotal())

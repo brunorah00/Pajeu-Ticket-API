@@ -31,4 +31,16 @@ public class VendaIngresso {
 
     @Column(name = "data_venda", nullable = false)
     private LocalDateTime dataVenda;
+
+    @Column(name = "codigo_pedido", unique = true, length = 24)
+    private String codigoPedido;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_pedido", length = 20, columnDefinition = "varchar(20) default 'PENDENTE'")
+    @Builder.Default
+    private StatusPedidoBomboniere status = StatusPedidoBomboniere.PENDENTE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id")
+    private Usuario cliente;
 }

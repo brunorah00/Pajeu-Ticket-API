@@ -47,7 +47,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/sessoes", "/sessoes/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/salas", "/salas/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/vendas-ingresso/registrar").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -1,9 +1,12 @@
 package com.cinepajeu.service.impl;
 
+import com.cinepajeu.dto.AtualizarStatusPedidoDTO;
 import com.cinepajeu.dto.VendaIngressoRequestDTO;
 import com.cinepajeu.dto.VendaIngressoResponseDTO;
 import com.cinepajeu.entity.AssentoReservado;
 import com.cinepajeu.entity.Sessao;
+import com.cinepajeu.entity.StatusPedidoBomboniere;
+import com.cinepajeu.entity.Usuario;
 import com.cinepajeu.entity.VendaIngresso;
 import com.cinepajeu.exception.BusinessException;
 import com.cinepajeu.mapper.ModelMapper;
@@ -11,14 +14,18 @@ import com.cinepajeu.repository.AssentoReservadoRepository;
 import com.cinepajeu.repository.SessaoRepository;
 import com.cinepajeu.repository.VendaIngressoRepository;
 import com.cinepajeu.service.VendaIngressoService;
+import com.cinepajeu.util.CodigoPedidoGenerator;
 import com.cinepajeu.util.MapaSala;
+import com.cinepajeu.util.SecurityUtils;
 import com.cinepajeu.util.SessaoEncerramento;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -32,10 +39,13 @@ public class VendaIngressoServiceImpl implements VendaIngressoService {
     private final VendaIngressoRepository vendaIngressoRepository;
     private final SessaoRepository sessaoRepository;
     private final AssentoReservadoRepository assentoReservadoRepository;
+    private final CodigoPedidoGenerator codigoPedidoGenerator;
 
     @Override
     @Transactional
     public VendaIngressoResponseDTO registrarVenda(VendaIngressoRequestDTO request) {
+        Usuario cliente = SecurityUtils.getUsuarioAutenticado();
+
         Sessao sessao = sessaoRepository.findById(request.getSessaoId())
                 .orElseThrow(() -> new BusinessException("Sessão não encontrada com o ID: " + request.getSessaoId()));
 
@@ -77,6 +87,9 @@ public class VendaIngressoServiceImpl implements VendaIngressoService {
         BigDecimal valorTotal = sessao.getValorIngresso().multiply(BigDecimal.valueOf(quantidade));
 
         VendaIngresso venda = VendaIngresso.builder()
+                .codigoPedido(codigoPedidoGenerator.gerarIngresso())
+                .status(StatusPedidoBomboniere.PENDENTE)
+                .cliente(cliente)
                 .sessao(sessao)
                 .quantidade(quantidade)
                 .valorTotal(valorTotal)
@@ -97,6 +110,55 @@ public class VendaIngressoServiceImpl implements VendaIngressoService {
         }
 
         return ModelMapper.toDto(salva, assentosOrdenados);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VendaIngressoResponseDTO> listarPedidos(StatusPedidoBomboniere status) {
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime inicio = hoje.atStartOfDay();
+        LocalDateTime fim = hoje.atTime(LocalTime.MAX);
+        return vendaIngressoRepository.findPedidosDoDia(inicio, fim, status).stream()
+                .map(v -> {
+                    List<String> assentos = assentoReservadoRepository.findByVenda_IdOrderByCodigoAssentoAsc(v.getId())
+                            .stream()
+                            .map(AssentoReservado::getCodigoAssento)
+                            .toList();
+                    return ModelMapper.toDto(v, assentos);
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VendaIngressoResponseDTO> listarMeusPedidos() {
+        Usuario cliente = SecurityUtils.getUsuarioAutenticado();
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime inicio = hoje.minusDays(30).atStartOfDay();
+        LocalDateTime fim = hoje.atTime(LocalTime.MAX);
+        return vendaIngressoRepository.findPedidosByCliente(cliente.getId(), inicio, fim).stream()
+                .map(v -> {
+                    List<String> assentos = assentoReservadoRepository.findByVenda_IdOrderByCodigoAssentoAsc(v.getId())
+                            .stream()
+                            .map(AssentoReservado::getCodigoAssento)
+                            .toList();
+                    return ModelMapper.toDto(v, assentos);
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public VendaIngressoResponseDTO atualizarStatus(Long id, AtualizarStatusPedidoDTO request) {
+        VendaIngresso venda = vendaIngressoRepository.findPedidoById(id)
+                .orElseThrow(() -> new BusinessException("Pedido de ingresso não encontrado com o ID: " + id));
+        venda.setStatus(request.getStatus());
+        vendaIngressoRepository.save(venda);
+        List<String> assentos = assentoReservadoRepository.findByVenda_IdOrderByCodigoAssentoAsc(venda.getId())
+                .stream()
+                .map(AssentoReservado::getCodigoAssento)
+                .toList();
+        return ModelMapper.toDto(venda, assentos);
     }
 
     private List<String> resolverAssentos(VendaIngressoRequestDTO request) {

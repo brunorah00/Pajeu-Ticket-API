@@ -12,5 +12,7 @@ public interface VendaProdutoService {
 
     List<VendaProdutoResponseDTO> listarPedidos(StatusPedidoBomboniere status);
 
+    List<VendaProdutoResponseDTO> listarMeusPedidos();
+
     VendaProdutoResponseDTO atualizarStatus(Long id, AtualizarStatusPedidoDTO request);
 }

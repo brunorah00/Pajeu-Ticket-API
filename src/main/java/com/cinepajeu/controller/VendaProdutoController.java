@@ -47,6 +47,13 @@ public class VendaProdutoController {
         return ResponseEntity.ok(vendaProdutoService.listarPedidos(status));
     }
 
+    @GetMapping("/meus-pedidos")
+    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO','CLIENTE')")
+    @Operation(summary = "Listar pedidos da bomboniere do cliente autenticado")
+    public ResponseEntity<List<VendaProdutoResponseDTO>> listarMeusPedidos() {
+        return ResponseEntity.ok(vendaProdutoService.listarMeusPedidos());
+    }
+
     @PatchMapping("/pedidos/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
     @Operation(summary = "Atualizar status do pedido da bomboniere")

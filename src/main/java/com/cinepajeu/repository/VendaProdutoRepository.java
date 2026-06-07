@@ -46,4 +46,17 @@ public interface VendaProdutoRepository extends JpaRepository<VendaProduto, Long
             WHERE v.id = :id
             """)
     Optional<VendaProduto> findByIdComItens(@Param("id") Long id);
+
+    @Query("""
+            SELECT DISTINCT v FROM VendaProduto v
+            LEFT JOIN FETCH v.itens i
+            LEFT JOIN FETCH i.produto
+            WHERE v.cliente.id = :clienteId
+            AND v.dataVenda BETWEEN :start AND :end
+            ORDER BY v.dataVenda DESC
+            """)
+    List<VendaProduto> findPedidosByCliente(
+            @Param("clienteId") Long clienteId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

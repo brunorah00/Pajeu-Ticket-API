@@ -41,7 +41,7 @@ public class VendaProdutoServiceImpl implements VendaProdutoService {
         Usuario cliente = SecurityUtils.getUsuarioAutenticado();
 
         VendaProduto venda = VendaProduto.builder()
-                .codigoPedido(codigoPedidoGenerator.gerar())
+                .codigoPedido(codigoPedidoGenerator.gerarBomboniere())
                 .status(StatusPedidoBomboniere.PENDENTE)
                 .cliente(cliente)
                 .dataVenda(LocalDateTime.now())
@@ -98,6 +98,18 @@ public class VendaProdutoServiceImpl implements VendaProdutoService {
         LocalDateTime inicio = hoje.atStartOfDay();
         LocalDateTime fim = hoje.atTime(LocalTime.MAX);
         return vendaProdutoRepository.findPedidosComItens(inicio, fim, status).stream()
+                .map(ModelMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VendaProdutoResponseDTO> listarMeusPedidos() {
+        Usuario cliente = SecurityUtils.getUsuarioAutenticado();
+        LocalDate hoje = LocalDate.now();
+        LocalDateTime inicio = hoje.minusDays(30).atStartOfDay();
+        LocalDateTime fim = hoje.atTime(LocalTime.MAX);
+        return vendaProdutoRepository.findPedidosByCliente(cliente.getId(), inicio, fim).stream()
                 .map(ModelMapper::toDto)
                 .toList();
     }

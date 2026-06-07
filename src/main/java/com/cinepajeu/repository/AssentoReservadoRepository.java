@@ -14,5 +14,5 @@ public interface AssentoReservadoRepository extends JpaRepository<AssentoReserva
 
     boolean existsBySessaoIdAndCodigoAssentoIn(Long sessaoId, Set<String> codigos);
 
-    List<AssentoReservado> findBySessaoIdAndCodigoAssentoIn(Long sessaoId, Set<String> codigos);
+    List<AssentoReservado> findByVenda_IdOrderByCodigoAssentoAsc(Long vendaId);
 }

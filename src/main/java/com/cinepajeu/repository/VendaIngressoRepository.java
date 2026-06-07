@@ -1,5 +1,6 @@
 package com.cinepajeu.repository;
 
+import com.cinepajeu.entity.StatusPedidoBomboniere;
 import com.cinepajeu.entity.VendaIngresso;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -42,4 +43,46 @@ public interface VendaIngressoRepository extends JpaRepository<VendaIngresso, Lo
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM VendaIngresso v WHERE v.sessao.id = :sessaoId")
     void deleteBySessaoId(@Param("sessaoId") Long sessaoId);
+
+    boolean existsByCodigoPedido(String codigoPedido);
+
+    @Query("""
+            SELECT DISTINCT v FROM VendaIngresso v
+            JOIN FETCH v.sessao s
+            JOIN FETCH s.filme
+            LEFT JOIN FETCH v.cliente
+            WHERE v.dataVenda BETWEEN :start AND :end
+            AND v.codigoPedido IS NOT NULL
+            AND v.codigoPedido NOT LIKE 'ING-LEG%'
+            AND (:status IS NULL OR v.status = :status)
+            ORDER BY v.dataVenda DESC
+            """)
+    List<VendaIngresso> findPedidosDoDia(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("status") StatusPedidoBomboniere status);
+
+    @Query("""
+            SELECT DISTINCT v FROM VendaIngresso v
+            JOIN FETCH v.sessao s
+            JOIN FETCH s.filme
+            LEFT JOIN FETCH v.cliente
+            WHERE v.id = :id
+            """)
+    java.util.Optional<VendaIngresso> findPedidoById(@Param("id") Long id);
+
+    @Query("""
+            SELECT DISTINCT v FROM VendaIngresso v
+            JOIN FETCH v.sessao s
+            JOIN FETCH s.filme
+            WHERE v.cliente.id = :clienteId
+            AND v.dataVenda BETWEEN :start AND :end
+            AND v.codigoPedido IS NOT NULL
+            AND v.codigoPedido NOT LIKE 'ING-LEG%'
+            ORDER BY v.dataVenda DESC
+            """)
+    List<VendaIngresso> findPedidosByCliente(
+            @Param("clienteId") Long clienteId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }
